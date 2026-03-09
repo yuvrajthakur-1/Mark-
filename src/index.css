@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700;800;900&family=Carter+One&family=Barlow+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-kanit: "Kanit", sans-serif;
+  --font-carter: "Carter One", cursive;
+  --font-barlow: "Barlow Condensed", sans-serif;
+  --color-brand: #1589EE;
+}
+
+body {
+  font-family: var(--font-kanit);
+  background-color: #f8fafc;
+  color: #1e293b;
+}
