@@ -174,12 +174,6 @@ const Features = () => {
       color: "bg-emerald-50"
     },
     {
-      icon: <FileText className="text-orange-600" />,
-      title: "Revision Notes",
-      description: "Quickly revise concepts with concise notes and formula sheets designed for last-minute prep.",
-      color: "bg-orange-50"
-    },
-    {
       icon: <Layout className="text-rose-600" />,
       title: "Mock Tests",
       description: "Take full-length mock tests that simulate the actual exam environment and difficulty.",
@@ -360,7 +354,6 @@ const Testimonials = () => {
 const Resources = () => {
   const resources = [
     { title: "Formula Sheets", count: "500+ Formulas", icon: <FileText className="text-blue-500" /> },
-    { title: "Revision Notes", count: "200+ Chapters", icon: <BookOpen className="text-purple-500" /> },
     { title: "PYQ Collections", count: "10+ Years", icon: <ClipboardCheck className="text-emerald-500" /> },
     { title: "Mind Maps", count: "150+ Topics", icon: <Layout className="text-orange-500" /> },
   ];

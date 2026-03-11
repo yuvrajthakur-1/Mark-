@@ -9,8 +9,11 @@ import {
   Info,
   BookOpen,
   LayoutGrid,
-  X
+  X,
+  BookMarked
 } from 'lucide-react';
+import { notebookDB } from '../../utils/notebookDB';
+import { useUser } from '../../context/UserContext';
 
 interface SolutionViewerProps {
   results: any;
@@ -20,6 +23,8 @@ interface SolutionViewerProps {
 const SolutionViewer: React.FC<SolutionViewerProps> = ({ results, onBack }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showNavModal, setShowNavModal] = useState(false);
+  const [savedToNotebook, setSavedToNotebook] = useState<Record<number, boolean>>({});
+  const { user } = useUser();
   const questions = results.questions;
   const currentQuestion = questions[currentIndex];
   const userAnswer = results.answers[currentQuestion.id];
@@ -32,6 +37,20 @@ const SolutionViewer: React.FC<SolutionViewerProps> = ({ results, onBack }) => {
 
   const handlePrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  const handleSaveToNotebook = () => {
+    if (savedToNotebook[currentQuestion.id]) return;
+
+    notebookDB.addNote({
+      email: user?.email || 'student@example.com',
+      subject: currentQuestion.subject || 'General',
+      chapter: currentQuestion.chapter || 'Mistakes',
+      title: `Mistake - Q${currentIndex + 1}`,
+      content: `Question:\n${currentQuestion.text}\n\nMistake:\n${isUnattempted ? 'Not Attempted' : 'Incorrect Answer'}\n\nCorrect Concept:\n${currentQuestion.explanation || 'See solution for details.'}`
+    });
+
+    setSavedToNotebook(prev => ({ ...prev, [currentQuestion.id]: true }));
   };
 
   return (
@@ -118,9 +137,34 @@ const SolutionViewer: React.FC<SolutionViewerProps> = ({ results, onBack }) => {
 
         {/* Solution Section */}
         <div className="space-y-4 pt-4">
-          <div className="flex items-center gap-2 text-brand">
-            <BookOpen size={20} />
-            <h3 className="font-bold">Detailed Solution</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-brand">
+              <BookOpen size={20} />
+              <h3 className="font-bold">Detailed Solution</h3>
+            </div>
+            {!isCorrect && (
+              <button
+                onClick={handleSaveToNotebook}
+                disabled={savedToNotebook[currentQuestion.id]}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  savedToNotebook[currentQuestion.id] 
+                    ? 'bg-emerald-500/20 text-emerald-500' 
+                    : 'bg-brand/20 text-brand hover:bg-brand/30'
+                }`}
+              >
+                {savedToNotebook[currentQuestion.id] ? (
+                  <>
+                    <CheckCircle2 size={14} />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <BookMarked size={14} />
+                    Save to Notebook
+                  </>
+                )}
+              </button>
+            )}
           </div>
           <div className="bg-slate-800/40 p-6 rounded-[2rem] border border-white/5 space-y-4">
             <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20">

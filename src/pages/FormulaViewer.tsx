@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Bookmark, ThumbsDown, ThumbsUp, List, Zap, ChevronLeft } from 'lucide-react';
+import { X, Bookmark, ThumbsDown, ThumbsUp, List, Zap, ChevronLeft, BookMarked as BookMarkedIcon } from 'lucide-react';
 import { formulasData } from '../data/formulas';
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
+import { notebookDB } from '../utils/notebookDB';
+import { useUser } from '../context/UserContext';
 
 const FormulaViewer = () => {
   const navigate = useNavigate();
@@ -30,6 +32,8 @@ const FormulaViewer = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [localCards, setLocalCards] = useState(cards);
   const [isFinished, setIsFinished] = useState(false);
+  const [savedToNotebook, setSavedToNotebook] = useState<Record<number, boolean>>({});
+  const { user } = useUser();
 
   if (!localCards || localCards.length === 0) {
     return (
@@ -135,6 +139,20 @@ const FormulaViewer = () => {
     updateStatus('bookmarked');
   };
 
+  const handleSaveToNotebook = () => {
+    if (savedToNotebook[currentIndex]) return;
+
+    notebookDB.addNote({
+      email: user?.email || 'student@example.com',
+      subject: subjectKey,
+      chapter: chapterKey,
+      title: `Formula: ${currentCard.title}`,
+      content: `Definition:\n${currentCard.definition}\n\nFormula:\n${currentCard.formula}\n\nVariables:\n${Object.entries(currentCard.variables).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+    });
+
+    setSavedToNotebook(prev => ({ ...prev, [currentIndex]: true }));
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-kanit flex flex-col relative overflow-hidden">
       {/* Header */}
@@ -171,12 +189,25 @@ const FormulaViewer = () => {
             </div>
           )}
         </div>
-        <button 
-          onClick={toggleBookmark}
-          className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-all shadow-sm border border-slate-200"
-        >
-          <Bookmark size={20} className={currentCard.status.bookmarked ? "fill-current text-blue-500" : ""} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleSaveToNotebook}
+            disabled={savedToNotebook[currentIndex]}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm border ${
+              savedToNotebook[currentIndex] 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-500' 
+                : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <BookMarkedIcon size={20} className={savedToNotebook[currentIndex] ? "fill-current" : ""} />
+          </button>
+          <button 
+            onClick={toggleBookmark}
+            className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-all shadow-sm border border-slate-200"
+          >
+            <Bookmark size={20} className={currentCard.status.bookmarked ? "fill-current text-blue-500" : ""} />
+          </button>
+        </div>
       </div>
 
       {/* Card Content Area */}

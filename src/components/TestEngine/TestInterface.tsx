@@ -10,9 +10,11 @@ import {
   AlertCircle,
   HelpCircle,
   Menu,
-  Play
+  Play,
+  PenTool
 } from 'lucide-react';
 import { SubjectType, Question } from './types';
+import Scratchpad from '../Scratchpad';
 
 interface TestInterfaceProps {
   testData: any;
@@ -29,6 +31,7 @@ const TestInterface: React.FC<TestInterfaceProps> = ({ testData, onExit, onSubmi
   const [showNavModal, setShowNavModal] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showScratchpad, setShowScratchpad] = useState(false);
 
   // Mock questions generation
   const questions: Question[] = React.useMemo(() => {
@@ -147,6 +150,13 @@ const TestInterface: React.FC<TestInterfaceProps> = ({ testData, onExit, onSubmi
         
         <div className="flex items-center gap-3">
           <button 
+            onClick={() => setShowScratchpad(!showScratchpad)}
+            className={`p-2 rounded-xl border transition-colors ${showScratchpad ? 'bg-brand/20 border-brand/50 text-brand' : 'bg-slate-800 border-white/5 text-slate-400 hover:text-brand'}`}
+            title="Scratchpad"
+          >
+            <PenTool size={18} />
+          </button>
+          <button 
             onClick={() => setIsPaused(true)}
             className="p-2 bg-slate-800 rounded-xl border border-white/5 text-slate-400 hover:text-brand transition-colors"
           >
@@ -164,6 +174,13 @@ const TestInterface: React.FC<TestInterfaceProps> = ({ testData, onExit, onSubmi
           Submit
         </button>
       </header>
+
+      {/* Scratchpad Overlay */}
+      <AnimatePresence>
+        {showScratchpad && (
+          <Scratchpad onClose={() => setShowScratchpad(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Subject Tabs */}
       <div className="flex px-4 bg-slate-900/30 border-b border-white/5 overflow-x-auto no-scrollbar">

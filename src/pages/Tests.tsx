@@ -9,10 +9,13 @@ import TestReport from '../components/TestEngine/TestReport';
 import SolutionViewer from '../components/TestEngine/SolutionViewer';
 import PYQHome from '../components/TestEngine/PYQ/PYQHome';
 import PYQExamList from '../components/TestEngine/PYQ/PYQExamList';
+import AnalysisDashboard from './AnalysisDashboard';
 import { CustomTest, PYQPaper } from '../components/TestEngine/types';
 import { useUser } from '../context/UserContext';
 
-type TestView = 'home' | 'create-list' | 'create-flow' | 'countdown' | 'interface' | 'report' | 'solutions' | 'pyq-home' | 'pyq-exam-list';
+import { saveTestReport } from '../utils/analysis';
+
+type TestView = 'home' | 'create-list' | 'create-flow' | 'countdown' | 'interface' | 'report' | 'solutions' | 'pyq-home' | 'pyq-exam-list' | 'analysis-dashboard';
 
 const Tests = () => {
   const location = useLocation();
@@ -55,6 +58,7 @@ const Tests = () => {
       else setView('create-list');
     }
     else if (view === 'solutions') setView('report');
+    else if (view === 'analysis-dashboard') setView('report');
     else if (view === 'pyq-home') setView('home');
     else if (view === 'pyq-exam-list') setView('pyq-home');
     else window.history.back();
@@ -70,9 +74,25 @@ const Tests = () => {
     const correct = results.questions.filter((q: any) => String(results.answers[q.id]) === String(q.correctAnswer)).length;
     const attempted = Object.keys(results.answers).length;
     const incorrect = attempted - correct;
+    const skipped = results.questions.length - attempted;
     const score = correct * 4 - incorrect * 1;
 
     setTestResults({ ...results, score, name: activeTestData.name });
+    
+    // Save report for analysis
+    saveTestReport({
+      email: 'student@example.com', // Mock email
+      testId: activeTestData.id,
+      subject: activeTestData.subjects?.[0] || 'Physics', // Default to Physics if not specified
+      chapter: activeTestData.chapters?.[0] || 'General',
+      correct,
+      wrong: incorrect,
+      skipped,
+      total: results.questions.length,
+      score,
+      timeTaken: results.timeSpent || 0,
+      date: new Date().toISOString()
+    });
     
     // Update global user stats
     setCurrentQs(prev => prev + attempted);
@@ -217,6 +237,7 @@ const Tests = () => {
           results={testResults || { questions: [], answers: {}, timeSpent: 0 }}
           onBack={() => setView('create-list')}
           onViewSolutions={() => setView('solutions')}
+          onViewAnalysis={() => setView('analysis-dashboard')}
         />
       )}
 
@@ -225,6 +246,10 @@ const Tests = () => {
           results={testResults}
           onBack={() => setView('report')}
         />
+      )}
+
+      {view === 'analysis-dashboard' && (
+        <AnalysisDashboard onBack={() => setView('report')} />
       )}
     </div>
   );

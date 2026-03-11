@@ -10,6 +10,7 @@ interface UserContextType {
   streak: number;
   setStreak: (streak: number) => void;
   userRank: number;
+  user: { email: string; name: string } | null;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -20,6 +21,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [pointsEarned, setPointsEarned] = useState(925);
   const [streak, setStreak] = useState(5);
   const [userRank, setUserRank] = useState(58);
+  const [user, setUser] = useState<{ email: string; name: string } | null>({ email: 'student@example.com', name: 'Student' });
 
   // Simple logic to calculate rank based on points
   // In a real app, this would be calculated against other users on a backend
@@ -36,7 +38,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentQs, setCurrentQs,
       pointsEarned, setPointsEarned,
       streak, setStreak,
-      userRank
+      userRank,
+      user
     }}>
       {children}
     </UserContext.Provider>

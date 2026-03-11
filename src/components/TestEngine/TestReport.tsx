@@ -19,9 +19,10 @@ interface TestReportProps {
   results: any;
   onBack: () => void;
   onViewSolutions: () => void;
+  onViewAnalysis?: () => void;
 }
 
-const TestReport: React.FC<TestReportProps> = ({ results, onBack, onViewSolutions }) => {
+const TestReport: React.FC<TestReportProps> = ({ results, onBack, onViewSolutions, onViewAnalysis }) => {
   const [activeTab, setActiveTab] = useState<'Overall' | SubjectType>('Overall');
 
   // Calculate stats
@@ -190,15 +191,29 @@ const TestReport: React.FC<TestReportProps> = ({ results, onBack, onViewSolution
         </div>
 
         {/* Action Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={onViewSolutions}
-          className="w-full py-4 bg-slate-800 text-white font-bold rounded-2xl flex items-center justify-center gap-3 border border-white/5 shadow-xl"
-        >
-          <BookOpen size={20} />
-          View Solutions & Explanations
-          <ChevronRight size={20} />
-        </motion.button>
+        <div className="space-y-3">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={onViewSolutions}
+            className="w-full py-4 bg-slate-800 text-white font-bold rounded-2xl flex items-center justify-center gap-3 border border-white/5 shadow-xl"
+          >
+            <BookOpen size={20} />
+            View Solutions & Explanations
+            <ChevronRight size={20} />
+          </motion.button>
+          
+          {onViewAnalysis && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={onViewAnalysis}
+              className="w-full py-4 bg-brand text-white font-bold rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-brand/20"
+            >
+              <BarChart3 size={20} />
+              View Full Analysis
+              <ChevronRight size={20} />
+            </motion.button>
+          )}
+        </div>
       </main>
     </div>
   );

@@ -6,7 +6,7 @@ const BottomNav = () => {
   const navItems = [
     { icon: <Home size={24} />, label: 'Home', path: '/app' },
     { icon: <ClipboardList size={24} />, label: 'Tests', path: '/app/tests' },
-    { icon: <BookMarked size={24} />, label: 'Notebooks', path: '/app/notebooks' },
+    { icon: <BookMarked size={24} />, label: 'Notebook', path: '/app/notebook' },
     { icon: <User size={24} />, label: 'My Profile', path: '/app/profile' },
   ];
 

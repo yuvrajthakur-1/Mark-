@@ -19,7 +19,8 @@ import {
   Plus,
   X,
   RotateCcw,
-  BookOpen
+  BookOpen,
+  PenTool
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
@@ -28,7 +29,7 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState('Physics');
   
   // Daily Goal State from Context
-  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, pointsEarned, setPointsEarned, streak } = useUser();
+  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, pointsEarned, setPointsEarned, streak, setStreak } = useUser();
   
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newGoalValue, setNewGoalValue] = useState(dailyGoal.toString());
@@ -44,6 +45,76 @@ const Home = () => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
 
   const progressPercentage = Math.min(100, Math.max(0, (currentQs / dailyGoal) * 100));
+  const isTodayCompleted = currentQs >= dailyGoal;
+
+  useEffect(() => {
+    const todayStr = new Date('2026-03-09T22:02:39-07:00').toDateString();
+    const yesterday = new Date('2026-03-09T22:02:39-07:00');
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+
+    const lastCompletedDate = localStorage.getItem('lastCompletedDate');
+    let currentStreak = parseInt(localStorage.getItem('studyStreak') || '0');
+
+    // Initialize if empty
+    if (!localStorage.getItem('studyStreak')) {
+      currentStreak = streak;
+      localStorage.setItem('studyStreak', currentStreak.toString());
+      localStorage.setItem('lastCompletedDate', yesterdayStr);
+    }
+
+    if (currentQs >= dailyGoal) {
+      if (lastCompletedDate !== todayStr) {
+        if (lastCompletedDate === yesterdayStr) {
+          currentStreak += 1;
+        } else {
+          currentStreak = 1;
+        }
+        localStorage.setItem('lastCompletedDate', todayStr);
+        localStorage.setItem('studyStreak', currentStreak.toString());
+        setStreak(currentStreak);
+      } else {
+         if (streak !== currentStreak) {
+           setStreak(currentStreak);
+         }
+      }
+    } else {
+      if (lastCompletedDate !== todayStr && lastCompletedDate !== yesterdayStr) {
+        currentStreak = 0;
+        localStorage.setItem('studyStreak', '0');
+        setStreak(0);
+      } else {
+        if (streak !== currentStreak) {
+          setStreak(currentStreak);
+        }
+      }
+    }
+  }, [currentQs, dailyGoal, setStreak, streak]);
+
+  // Generate last 7 days for streak
+  const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date('2026-03-09T22:02:39-07:00');
+    d.setDate(d.getDate() - (6 - i));
+    const isToday = i === 6;
+    
+    let isCompleted = false;
+    if (isToday) {
+      isCompleted = isTodayCompleted;
+    } else {
+      const daysAgo = 6 - i;
+      if (isTodayCompleted) {
+        isCompleted = daysAgo < streak;
+      } else {
+        isCompleted = daysAgo <= streak;
+      }
+    }
+
+    return {
+      dayName: d.toLocaleDateString('en-US', { weekday: 'short' })[0],
+      isToday,
+      isCompleted
+    };
+  });
 
   const handleSaveGoal = () => {
     const parsed = parseInt(newGoalValue);
@@ -224,29 +295,34 @@ const Home = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Study Streak</h3>
+              <div className="flex items-center gap-1 text-orange-500 bg-orange-500/10 px-2 py-1 rounded-md">
+                <Flame size={16} className="fill-orange-500" />
+                <span className="font-bold">{streak} Days</span>
+              </div>
+            </div>
             
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center">
-                <div className="flex items-center gap-1 text-emerald-500 mb-1">
-                  <CheckCircle2 size={14} />
-                  <span className="text-xs font-bold">Correct</span>
+            <div className="flex justify-between items-center">
+              {last7Days.map((day, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+                    day.isCompleted 
+                      ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
+                      : day.isToday
+                        ? 'bg-slate-700 border-2 border-orange-500 text-orange-500'
+                        : 'bg-slate-800/50 border border-white/5 text-slate-500'
+                  }`}>
+                    {day.isCompleted ? <Flame size={20} className="fill-white" /> : day.dayName}
+                  </div>
+                  <span className={`text-[10px] font-bold ${day.isToday ? 'text-orange-500' : 'text-slate-500'}`}>
+                    {day.isToday ? 'Today' : day.dayName}
+                  </span>
                 </div>
-                <span className="text-lg font-black text-white">{correctQs}</span>
-              </div>
-              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex flex-col items-center justify-center">
-                <div className="flex items-center gap-1 text-rose-500 mb-1">
-                  <X size={14} />
-                  <span className="text-xs font-bold">Wrong</span>
-                </div>
-                <span className="text-lg font-black text-white">{wrongQs}</span>
-              </div>
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col items-center justify-center">
-                <div className="flex items-center gap-1 text-amber-500 mb-1">
-                  <RotateCcw size={14} />
-                  <span className="text-xs font-bold">Re-attempt</span>
-                </div>
-                <span className="text-lg font-black text-white">15</span>
-              </div>
+              ))}
             </div>
           </div>
         </section>
@@ -345,6 +421,22 @@ const Home = () => {
         <section className="space-y-4">
           <h2 className="text-xl font-bold">MARKS Tests</h2>
           <div className="grid grid-cols-2 gap-4">
+            <Link to="/app/practice">
+              <motion.div 
+                whileTap={{ scale: 0.98 }}
+                className="bg-gradient-to-br from-blue-600 to-blue-800 p-5 rounded-3xl relative overflow-hidden group cursor-pointer h-full"
+              >
+                <div className="absolute top-3 right-3 bg-amber-500 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Hot</div>
+                <PenTool className="text-white/20 absolute -bottom-4 -right-4" size={80} />
+                <div className="relative z-10">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4">
+                    <PenTool size={20} />
+                  </div>
+                  <h3 className="font-bold leading-tight">Practice MCQs</h3>
+                </div>
+              </motion.div>
+            </Link>
+
             <Link to="/app/tests" state={{ initialView: 'pyq-home' }}>
               <motion.div 
                 whileTap={{ scale: 0.98 }}
@@ -361,7 +453,7 @@ const Home = () => {
               </motion.div>
             </Link>
             
-            <Link to="/app/tests" state={{ initialView: 'create-list' }}>
+            <Link to="/app/tests" state={{ initialView: 'create-list' }} className="col-span-2">
               <motion.div 
                 whileTap={{ scale: 0.98 }}
                 className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 rounded-3xl relative overflow-hidden group cursor-pointer h-full"
@@ -392,23 +484,6 @@ const Home = () => {
               </div>
             </div>
             <ChevronRight className="text-slate-500 group-hover:translate-x-1 transition-transform" />
-          </motion.div>
-
-          {/* Revision Notes */}
-          <motion.div 
-            whileTap={{ scale: 0.98 }}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-5 flex items-center justify-between group cursor-pointer shadow-lg shadow-purple-500/20"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-white backdrop-blur-sm">
-                <BookOpen size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-white">Revision Notes</h3>
-                <p className="text-xs text-white/80">Quickly revise concepts & formulas</p>
-              </div>
-            </div>
-            <ChevronRight className="text-white/80 group-hover:translate-x-1 transition-transform" />
           </motion.div>
         </section>
 
