@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Github } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { loginWithGoogle } = useUser();
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate signup
     navigate('/app');
+  };
+
+  const handleGoogleSignup = async () => {
+    try {
+      setError('');
+      await loginWithGoogle();
+      navigate('/app');
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/user-cancelled') {
+        setError('Sign-up was cancelled. If the popup was blocked, please allow popups for this site or try opening the app in a new tab.');
+      } else {
+        setError('Failed to sign up with Google. Please try again.');
+      }
+    }
   };
 
   return (
@@ -29,6 +46,12 @@ const Signup = () => {
           <h1 className="text-3xl font-bold text-slate-900">Create Account</h1>
           <p className="text-slate-500 mt-2">Join 5 million+ students today</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
@@ -88,11 +111,18 @@ const Signup = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700">
+            <button 
+              onClick={handleGoogleSignup}
+              type="button"
+              className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700"
+            >
               <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
               Google
             </button>
-            <button className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700">
+            <button 
+              type="button"
+              className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700"
+            >
               <Github size={20} />
               GitHub
             </button>

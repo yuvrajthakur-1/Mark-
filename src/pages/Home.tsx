@@ -29,7 +29,7 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState('Physics');
   
   // Daily Goal State from Context
-  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, pointsEarned, setPointsEarned, streak, setStreak } = useUser();
+  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, dailyPoints, streak, setStreak, user } = useUser();
   
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newGoalValue, setNewGoalValue] = useState(dailyGoal.toString());
@@ -48,8 +48,8 @@ const Home = () => {
   const isTodayCompleted = currentQs >= dailyGoal;
 
   useEffect(() => {
-    const todayStr = new Date('2026-03-09T22:02:39-07:00').toDateString();
-    const yesterday = new Date('2026-03-09T22:02:39-07:00');
+    const todayStr = new Date().toDateString();
+    const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toDateString();
 
@@ -93,7 +93,7 @@ const Home = () => {
 
   // Generate last 7 days for streak
   const last7Days = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date('2026-03-09T22:02:39-07:00');
+    const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const isToday = i === 6;
     
@@ -176,7 +176,7 @@ const Home = () => {
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full border-2 border-brand p-0.5">
             <img 
-              src="https://picsum.photos/seed/user/100/100" 
+              src={`https://picsum.photos/seed/${user?.uid || 'user'}/100/100`}
               alt="Avatar" 
               className="w-full h-full rounded-full object-cover"
               referrerPolicy="no-referrer"
@@ -184,7 +184,7 @@ const Home = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm font-medium">Hey, Students</span>
+              <span className="text-slate-400 text-sm font-medium">Hey, {user?.name || 'Student'}</span>
               <div className="bg-brand/20 text-brand text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand/30 uppercase tracking-wider">
                 Premium
               </div>
@@ -287,7 +287,7 @@ const Home = () => {
                 <div className="flex items-center gap-2 text-sm font-bold">
                   <span className="text-slate-400">Points Earned:</span>
                   <span className="text-amber-400 flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-md">
-                    <Zap size={14} className="fill-amber-400" /> {pointsEarned}
+                    <Zap size={14} className="fill-amber-400" /> {dailyPoints}
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">

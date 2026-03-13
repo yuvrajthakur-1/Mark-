@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   ClipboardCheck, 
@@ -16,9 +16,11 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const { user } = useUser();
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
@@ -36,9 +38,15 @@ const Navbar = () => {
             <a href="#" className="text-slate-600 hover:text-brand font-medium transition-colors">NEET</a>
             <a href="#" className="text-slate-600 hover:text-brand font-medium transition-colors">CUET</a>
             <a href="#" className="text-slate-600 hover:text-brand font-medium transition-colors">Resources</a>
-            <Link to="/login" className="bg-brand text-white px-6 py-2 rounded-full font-semibold hover:bg-brand/90 transition-all shadow-lg shadow-brand/20">
-              Sign In
-            </Link>
+            {user ? (
+              <Link to="/app" className="bg-brand text-white px-6 py-2 rounded-full font-semibold hover:bg-brand/90 transition-all shadow-lg shadow-brand/20">
+                Go to App
+              </Link>
+            ) : (
+              <Link to="/login" className="bg-brand text-white px-6 py-2 rounded-full font-semibold hover:bg-brand/90 transition-all shadow-lg shadow-brand/20">
+                Sign In
+              </Link>
+            )}
           </div>
 
           <div className="md:hidden">
@@ -60,9 +68,15 @@ const Navbar = () => {
           <a href="#" className="block text-slate-600 font-medium">NEET</a>
           <a href="#" className="block text-slate-600 font-medium">CUET</a>
           <a href="#" className="block text-slate-600 font-medium">Resources</a>
-          <Link to="/login" className="block w-full bg-brand text-white px-6 py-3 rounded-xl font-semibold text-center">
-            Sign In
-          </Link>
+          {user ? (
+            <Link to="/app" className="block w-full bg-brand text-white px-6 py-3 rounded-xl font-semibold text-center">
+              Go to App
+            </Link>
+          ) : (
+            <Link to="/login" className="block w-full bg-brand text-white px-6 py-3 rounded-xl font-semibold text-center">
+              Sign In
+            </Link>
+          )}
         </motion.div>
       )}
     </nav>
@@ -70,6 +84,8 @@ const Navbar = () => {
 };
 
 const Hero = () => {
+  const { user } = useUser();
+
   return (
     <section className="relative pt-20 pb-32 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,13 +106,13 @@ const Hero = () => {
               The ultimate preparation app for IIT JEE, NEET & CUET. Practice chapter-wise questions, take custom tests, and track your progress.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/signup" className="flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all group">
+              <Link to={user ? "/app" : "/signup"} className="flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all group">
                 <Download size={20} />
                 <span>Download App</span>
                 <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link to="/login" className="flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-bold hover:border-brand hover:text-brand transition-all">
-                <span>Try Web Version</span>
+              <Link to={user ? "/app" : "/login"} className="flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-bold hover:border-brand hover:text-brand transition-all">
+                <span>{user ? "Go to Web App" : "Try Web Version"}</span>
               </Link>
             </div>
           </motion.div>
@@ -612,6 +628,15 @@ const HowItWorks = () => {
 };
 
 export const Landing = () => {
+  const navigate = useNavigate();
+  const { user, loading } = useUser();
+
+  useEffect(() => {
+    if (user && !loading) {
+      navigate('/app');
+    }
+  }, [user, loading, navigate]);
+
   return (
     <div className="min-h-screen font-kanit">
       <Navbar />

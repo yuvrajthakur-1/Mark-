@@ -5,8 +5,9 @@ import {
   Bookmark, AlertTriangle, MoreVertical, ThumbsUp, ThumbsDown, MessageSquare,
   LayoutGrid, X, User, Clock
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Scratchpad from '../components/Scratchpad';
+import { useUser } from '../context/UserContext';
 
 type CommunitySolution = {
   id: string;
@@ -28,6 +29,17 @@ type Question = {
 };
 
 const MOCK_QUESTIONS: Question[] = [
+  {
+    id: 100,
+    subject: 'Physics',
+    chapter: 'Laws of Motion',
+    difficulty: 'Medium',
+    text: 'A block of mass m is placed on a smooth inclined plane of inclination θ. The inclined plane is accelerated horizontally so that the block does not slip. What is the acceleration?',
+    options: ['g sin θ', 'g tan θ', 'g cos θ', 'g cot θ'],
+    correctAnswer: 1,
+    solution: 'For the block to not slip, the pseudo force (ma) must balance the component of weight along the incline.\n\nma cos θ = mg sin θ\n\na = g tan θ',
+    communitySolutions: []
+  },
   {
     id: 101,
     subject: 'Physics',
@@ -78,7 +90,12 @@ const MOCK_QUESTIONS: Question[] = [
 
 const PracticeMCQScreen = () => {
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const location = useLocation();
+  
+  // Get initial index from location state, fallback to 0
+  const initialIndex = location.state?.questionIndex || 0;
+  const [currentIndex, setCurrentIndex] = useState(initialIndex % MOCK_QUESTIONS.length);
+  
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
   const [questionStates, setQuestionStates] = useState<Record<number, 'unvisited' | 'attempted' | 'correct' | 'incorrect'>>({});
   const [bookmarked, setBookmarked] = useState<Record<number, boolean>>({});
@@ -89,6 +106,7 @@ const PracticeMCQScreen = () => {
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [timeSpent, setTimeSpent] = useState<Record<number, number>>({});
+  const [attempts, setAttempts] = useState<Record<number, number>>({});
 
   const currentQuestion = MOCK_QUESTIONS[currentIndex];
   const selectedOption = userAnswers[currentQuestion.id] ?? null;
@@ -123,12 +141,14 @@ const PracticeMCQScreen = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const { saveActivity } = useUser();
+
   const handleOptionSelect = (index: number) => {
     if (isSubmitted) return;
     setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: index }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (selectedOption === null) return;
     
     const isCorrect = selectedOption === currentQuestion.correctAnswer;
@@ -137,6 +157,22 @@ const PracticeMCQScreen = () => {
       [currentQuestion.id]: isCorrect ? 'correct' : 'incorrect'
     }));
     setShowSolution(true);
+
+    // Calculate points
+    const currentAttempts = attempts[currentQuestion.id] || 0;
+    let points = 0;
+    if (isCorrect) {
+      if (currentAttempts === 0) {
+        points = 10;
+      } else {
+        points = 5;
+      }
+    }
+
+    // Save activity
+    const timeInMinutes = Math.round((timeSpent[currentQuestion.id] || 0) / 60);
+    const qsCount = currentAttempts === 0 ? 1 : 0; // Only count as new question on first attempt
+    await saveActivity(qsCount, isCorrect ? 100 : 0, timeInMinutes, points);
   };
 
   const handleClear = () => {
@@ -336,12 +372,35 @@ const PracticeMCQScreen = () => {
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => setShowSolution(!showSolution)}
-                className="flex-1 py-3 bg-slate-800 text-white border border-white/10 rounded-xl font-bold hover:bg-slate-700 transition-colors"
-              >
-                {showSolution ? 'Hide Solution' : 'Show Solution'}
-              </button>
+              <>
+                <button
+                  onClick={() => setShowSolution(!showSolution)}
+                  className="flex-1 py-3 bg-slate-800 text-white border border-white/10 rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                >
+                  {showSolution ? 'Hide Solution' : 'Show Solution'}
+                </button>
+                {questionStates[currentQuestion.id] === 'incorrect' && (
+                  <button
+                    onClick={() => {
+                      setQuestionStates(prev => {
+                        const newStates = { ...prev };
+                        delete newStates[currentQuestion.id];
+                        return newStates;
+                      });
+                      setUserAnswers(prev => {
+                        const newAnswers = { ...prev };
+                        delete newAnswers[currentQuestion.id];
+                        return newAnswers;
+                      });
+                      setShowSolution(false);
+                      setAttempts(prev => ({ ...prev, [currentQuestion.id]: (prev[currentQuestion.id] || 0) + 1 }));
+                    }}
+                    className="flex-1 py-3 bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-bold hover:bg-amber-500/30 transition-colors"
+                  >
+                    Re-attempt
+                  </button>
+                )}
+              </>
             )}
           </div>
         </motion.div>

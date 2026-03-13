@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "rank": { "type": "number" },
+        "points": { "type": "number" },
+        "streak": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "email", "name", "role", "points", "streak"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Daily activity record for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "description": "YYYY-MM-DD" },
+        "questionsSolved": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "timeSpent": { "type": "number" }
+      },
+      "required": ["userId", "date", "questionsSolved", "accuracy", "timeSpent"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/users/{userId}/activity/{date}": {
+      "schema": { "$ref": "#/entities/Activity" },
+      "description": "User daily activity"
+    }
+  }
+}

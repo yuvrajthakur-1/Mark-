@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Landing } from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -17,7 +17,26 @@ import FormulaSubject from './pages/FormulaSubject';
 import FormulaChapter from './pages/FormulaChapter';
 import FormulaViewer from './pages/FormulaViewer';
 import PracticeMCQScreen from './pages/PracticeMCQScreen';
-import { UserProvider } from './context/UserContext';
+import { UserProvider, useUser } from './context/UserContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useUser();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 const AppContent = () => {
   const location = useLocation();
@@ -33,19 +52,21 @@ const AppContent = () => {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/app" element={<Home />} />
-        <Route path="/app/tests" element={<Tests />} />
-        <Route path="/app/practice" element={<PracticeMCQScreen />} />
-        <Route path="/app/notebook" element={<NotebookHome />} />
-        <Route path="/app/notebook/add" element={<AddNote />} />
-        <Route path="/app/notebook/:id" element={<NoteViewer />} />
-        <Route path="/app/notebook/edit/:id" element={<EditNote />} />
-        <Route path="/app/profile" element={<Profile />} />
-        <Route path="/app/leaderboard" element={<Leaderboard />} />
-        <Route path="/app/exam/:examId" element={<ExamDashboard />} />
-        <Route path="/app/formulas/:subjectId" element={<FormulaSubject />} />
-        <Route path="/app/formulas/:subjectId/:chapterId" element={<FormulaChapter />} />
-        <Route path="/app/formulas/:subjectId/:chapterId/:topicId" element={<FormulaViewer />} />
+        
+        {/* Protected Routes */}
+        <Route path="/app" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/app/tests" element={<ProtectedRoute><Tests /></ProtectedRoute>} />
+        <Route path="/app/practice" element={<ProtectedRoute><PracticeMCQScreen /></ProtectedRoute>} />
+        <Route path="/app/notebook" element={<ProtectedRoute><NotebookHome /></ProtectedRoute>} />
+        <Route path="/app/notebook/add" element={<ProtectedRoute><AddNote /></ProtectedRoute>} />
+        <Route path="/app/notebook/:id" element={<ProtectedRoute><NoteViewer /></ProtectedRoute>} />
+        <Route path="/app/notebook/edit/:id" element={<ProtectedRoute><EditNote /></ProtectedRoute>} />
+        <Route path="/app/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/app/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+        <Route path="/app/exam/:examId" element={<ProtectedRoute><ExamDashboard /></ProtectedRoute>} />
+        <Route path="/app/formulas/:subjectId" element={<ProtectedRoute><FormulaSubject /></ProtectedRoute>} />
+        <Route path="/app/formulas/:subjectId/:chapterId" element={<ProtectedRoute><FormulaChapter /></ProtectedRoute>} />
+        <Route path="/app/formulas/:subjectId/:chapterId/:topicId" element={<ProtectedRoute><FormulaViewer /></ProtectedRoute>} />
       </Routes>
       {isAppRoute && !isExamDashboard && !isFormulaRoute && !isNotebookSubRoute && !isPracticeRoute && <BottomNav />}
     </div>
@@ -54,10 +75,12 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <UserProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </UserProvider>
+    <ErrorBoundary>
+      <UserProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </UserProvider>
+    </ErrorBoundary>
   );
 }

@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, Filter, ChevronDown, ArrowUpDown, ChevronRight, 
   Edit2, CheckCircle2, Bookmark, BarChart2, AlertCircle,
-  BookOpen, Target, Clock, FileText, Video, LayoutGrid, BookMarked
+  BookOpen, Target, Clock, FileText, Video, LayoutGrid, BookMarked,
+  History, ListOrdered, Check, FileEdit, AlertTriangle, Home
 } from 'lucide-react';
 import { syllabusData } from '../data/syllabus';
 import { ExamType, SubjectType } from '../components/TestEngine/types';
@@ -34,6 +35,7 @@ export default function ExamDashboard() {
   const [activeChapter, setActiveChapter] = useState<any>(null);
   const [view, setView] = useState<'dashboard' | 'chapter-detail' | 'all-questions' | 'analysis' | 'bookmarks' | 'mistakes' | 'filters'>('dashboard');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   
   // Filter States
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export default function ExamDashboard() {
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showCreateTestModal, setShowCreateTestModal] = useState(false);
   
   // Target Countdown State
   const [targetDate, setTargetDate] = useState<string>(() => {
@@ -58,8 +61,6 @@ export default function ExamDashboard() {
   const [daysLeft, setDaysLeft] = useState(0);
   
   // Interactive state for questions
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
-  const [showSolutions, setShowSolutions] = useState<Record<number, boolean>>({});
   const [bookmarkedQs, setBookmarkedQs] = useState<Record<number, boolean>>({});
   const [savedToNotebook, setSavedToNotebook] = useState<Record<number, boolean>>({});
   const { user } = useUser();
@@ -87,12 +88,25 @@ export default function ExamDashboard() {
       const unitNum = (index % 5) + 1;
       const totalQs = 50 + (index * 7) % 50;
       const solvedQs = (index * 3) % totalQs;
+      const correctQs = Math.floor(solvedQs * (0.4 + (index % 5) * 0.1)); // Random accuracy between 40% and 80%
+      const accuracy = solvedQs > 0 ? ((correctQs / solvedQs) * 100).toFixed(2) : '0.00';
       
+      const beginnerQs = Math.floor(totalQs * 0.3);
+      const targetMainQs = Math.floor(totalQs * 0.5);
+      const advanceQs = totalQs - beginnerQs - targetMainQs;
+      const mustDoQs = Math.floor(totalQs * 0.4);
+
       return {
         id: `c${index}`,
         name: chapterName,
         totalQs,
         solvedQs,
+        correctQs,
+        accuracy,
+        beginnerQs,
+        targetMainQs,
+        advanceQs,
+        mustDoQs,
         trend: { year: 2025, count: 10 + (index % 10), up: index % 2 === 0 },
         class: classLevel,
         unit: `Unit ${unitNum}`
@@ -146,7 +160,30 @@ export default function ExamDashboard() {
     });
   }, [targetDate]);
 
-  const renderDashboard = () => (
+  const renderDashboard = () => {
+    // Calculate overall progress
+    let totalSolved = 0;
+    let totalQs = 0;
+    const subjectProgress: Record<string, { solved: number, total: number }> = {};
+
+    availableSubjects.forEach(subject => {
+      const chapters = examData[subject as SubjectType] || [];
+      let subjectSolved = 0;
+      let subjectTotal = 0;
+      chapters.forEach((_, index) => {
+        const tQs = 50 + (index * 7) % 50;
+        const sQs = (index * 3) % tQs;
+        subjectSolved += sQs;
+        subjectTotal += tQs;
+      });
+      subjectProgress[subject] = { solved: subjectSolved, total: subjectTotal };
+      totalSolved += subjectSolved;
+      totalQs += subjectTotal;
+    });
+
+    const overallProgress = totalQs > 0 ? ((totalSolved / totalQs) * 100).toFixed(2) : '0.00';
+
+    return (
     <div className="space-y-6 pb-24">
       {/* Progress Card */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-[2rem] border border-white/5 shadow-xl relative overflow-hidden">
@@ -159,7 +196,7 @@ export default function ExamDashboard() {
         <div className="mb-6">
           <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Overall Progress</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-black text-white">14.74%</span>
+            <span className="text-4xl font-black text-white">{overallProgress}%</span>
           </div>
         </div>
 
@@ -171,14 +208,16 @@ export default function ExamDashboard() {
               { text: 'text-blue-500', bg: 'bg-blue-500' }
             ];
             const color = colors[index % colors.length];
+            const progress = subjectProgress[subject];
+            const percentage = progress.total > 0 ? (progress.solved / progress.total) * 100 : 0;
             return (
               <div key={subject} className="space-y-2">
                 <div className="flex justify-between text-xs font-bold">
                   <span className={color.text}>{subject}</span>
-                  <span className="text-slate-400">77/475 PYQ</span>
+                  <span className="text-slate-400">{progress.solved}/{progress.total} PYQ</span>
                 </div>
                 <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.random() * 20 + 5}%` }} className={`h-full ${color.bg} rounded-full`} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${percentage}%` }} className={`h-full ${color.bg} rounded-full`} />
                 </div>
               </div>
             );
@@ -242,7 +281,8 @@ export default function ExamDashboard() {
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderSubjectContent = () => (
     <div className="space-y-4 pb-24">
@@ -337,11 +377,11 @@ export default function ExamDashboard() {
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PYQ Solved</div>
         </div>
         <div>
-          <div className="text-2xl font-black text-emerald-500 mb-1">30<span className="text-sm text-slate-500">/{activeChapter.solvedQs}</span></div>
+          <div className="text-2xl font-black text-emerald-500 mb-1">{activeChapter.correctQs}<span className="text-sm text-slate-500">/{activeChapter.solvedQs}</span></div>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Correct Qs</div>
         </div>
         <div>
-          <div className="text-2xl font-black text-brand mb-1">43.48%</div>
+          <div className="text-2xl font-black text-brand mb-1">{activeChapter.accuracy}%</div>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Accuracy</div>
         </div>
       </div>
@@ -352,8 +392,7 @@ export default function ExamDashboard() {
           className="p-4 bg-brand text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg shadow-brand/20"
         >
           <Target size={24} />
-          All Previous Year Qs
-          <span className="text-xs font-medium opacity-80">{activeChapter.totalQs} PYQs</span>
+          Practice MCQ
         </button>
         <button 
           onClick={() => { setActiveFilter('Topic Wise'); setView('all-questions'); }}
@@ -374,7 +413,7 @@ export default function ExamDashboard() {
           >
             <div>
               <div className="font-bold text-emerald-500 mb-1">Beginner</div>
-              <div className="text-xs font-bold text-slate-400">23 Qs</div>
+              <div className="text-xs font-bold text-slate-400">{activeChapter.beginnerQs} Qs</div>
             </div>
             <ChevronRight size={16} className="text-slate-500" />
           </button>
@@ -384,7 +423,7 @@ export default function ExamDashboard() {
           >
             <div>
               <div className="font-bold text-blue-500 mb-1">Target Main</div>
-              <div className="text-xs font-bold text-slate-400">50 Qs</div>
+              <div className="text-xs font-bold text-slate-400">{activeChapter.targetMainQs} Qs</div>
             </div>
             <ChevronRight size={16} className="text-slate-500" />
           </button>
@@ -394,7 +433,7 @@ export default function ExamDashboard() {
           >
             <div>
               <div className="font-bold text-rose-500 mb-1">Advance Level</div>
-              <div className="text-xs font-bold text-slate-400">12 Qs</div>
+              <div className="text-xs font-bold text-slate-400">{activeChapter.advanceQs} Qs</div>
             </div>
             <ChevronRight size={16} className="text-slate-500" />
           </button>
@@ -404,7 +443,7 @@ export default function ExamDashboard() {
           >
             <div>
               <div className="font-bold text-orange-500 mb-1">Must Do</div>
-              <div className="text-xs font-bold text-slate-400">50 Qs</div>
+              <div className="text-xs font-bold text-slate-400">{activeChapter.mustDoQs} Qs</div>
             </div>
             <ChevronRight size={16} className="text-slate-500" />
           </button>
@@ -413,15 +452,58 @@ export default function ExamDashboard() {
     </div>
   );
 
+  const DashboardBottomNav = () => (
+    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-lg border-t border-white/5 pb-safe z-50">
+      <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
+        <button 
+          onClick={() => setView('dashboard')}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${view === 'dashboard' || view === 'chapter-detail' || view === 'all-questions' ? 'text-brand' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <Home size={24} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Home</span>
+        </button>
+        <button 
+          onClick={() => setShowCreateTestModal(true)}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all relative ${showCreateTestModal ? 'text-brand' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <div className="absolute -top-2 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">NEW</div>
+          <FileEdit size={24} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Create Test</span>
+        </button>
+        <button 
+          onClick={() => setView('analysis')}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${view === 'analysis' ? 'text-brand' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <BarChart2 size={24} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Analysis</span>
+        </button>
+        <button 
+          onClick={() => setView('bookmarks')}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${view === 'bookmarks' ? 'text-brand' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <BookMarked size={24} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Bookmarks</span>
+        </button>
+        <button 
+          onClick={() => setView('mistakes')}
+          className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all relative ${view === 'mistakes' ? 'text-brand' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <div className="absolute -top-2 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">NEW</div>
+          <AlertTriangle size={24} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">My Mistakes</span>
+        </button>
+      </div>
+    </div>
+  );
+
   const renderAllQuestions = () => {
-    let title = 'All PYQs';
+    const isTopicOrAll = activeFilter === 'Topic Wise' || !activeFilter;
+    
+    let title = 'Practice MCQ';
     let subtitle = activeChapter.name;
     let questionCount = activeChapter.totalQs;
 
-    if (activeFilter === 'Topic Wise') {
-      title = 'Topic Wise PYQs';
-      subtitle = '2 Topics Available';
-    } else if (activeFilter === 'Beginner') {
+    if (activeFilter === 'Beginner') {
       title = 'Beginner Level';
       questionCount = 23;
     } else if (activeFilter === 'Target Main') {
@@ -433,6 +515,187 @@ export default function ExamDashboard() {
     } else if (activeFilter === 'Must Do') {
       title = 'Must Do';
       questionCount = 50;
+    }
+
+    if (isTopicOrAll) {
+      if (selectedTopic) {
+        const topicQsCount = selectedTopic === 'Units' ? Math.floor(activeChapter.totalQs * 0.3) : Math.floor(activeChapter.totalQs * 0.7);
+        return (
+          <div className="space-y-4 pb-24">
+            <div className="space-y-6">
+              <header className="flex items-center gap-4 mb-6">
+                <button 
+                  onClick={() => setSelectedTopic(null)}
+                  className="p-2 -ml-2 hover:bg-white/5 rounded-full transition-colors text-slate-400"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+                <div>
+                  <h1 className="text-xl font-bold text-white">{selectedTopic}</h1>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                    {examKey} » {topicQsCount} PYQs
+                  </p>
+                </div>
+              </header>
+
+              <div className="flex items-center justify-between text-sm font-bold text-slate-400 mb-4">
+                <span>{topicQsCount} Questions</span>
+                <button className="flex items-center gap-1 text-brand">
+                  <ArrowUpDown size={14} /> New to Old
+                </button>
+              </div>
+
+              {Array.from({ length: Math.min(10, topicQsCount) }).map((_, i) => {
+                const isBookmarked = bookmarkedQs[i];
+
+                return (
+                  <div 
+                    key={i} 
+                    className="bg-slate-800/40 p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+                    onClick={() => navigate('/app/practice', { state: { questionIndex: i } })}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-sm">Q{i+1}</span>
+                        <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded border border-white/5">2025 • Shift 1</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {i % 3 === 0 && <Video size={16} className="text-brand" />}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }));
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                        >
+                          <Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-slate-200 leading-relaxed">
+                      A block of mass m is placed on a smooth inclined plane of inclination θ. The inclined plane is accelerated horizontally so that the block does not slip. What is the acceleration?
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <DashboardBottomNav />
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-4 pb-24">
+          <header className="flex items-center gap-4 mb-6">
+            <button onClick={() => setView('chapter-detail')} className="p-2 -ml-2 hover:bg-white/5 rounded-full transition-colors">
+              <ArrowLeft size={24} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold">{activeChapter.name}</h1>
+              <p className="text-sm text-slate-400 font-medium mt-0.5">
+                {examKey} » {activeChapter.totalQs} PYQs | 2 Topics
+              </p>
+            </div>
+          </header>
+
+          <div className="flex border-b border-white/10 mb-6">
+            <button 
+              onClick={() => { setActiveFilter(null); setSelectedTopic(null); }}
+              className={`flex-1 pb-3 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${!activeFilter ? 'text-brand border-b-2 border-brand' : 'text-slate-400 hover:text-slate-300'}`}
+            >
+              <History size={18} />
+              All PYQs
+            </button>
+            <button 
+              onClick={() => { setActiveFilter('Topic Wise'); setSelectedTopic(null); }}
+              className={`flex-1 pb-3 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${activeFilter === 'Topic Wise' ? 'text-brand border-b-2 border-brand' : 'text-slate-400 hover:text-slate-300'}`}
+            >
+              <ListOrdered size={18} />
+              Topic-Wise PYQs
+            </button>
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto no-scrollbar mb-6">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-brand bg-brand/10 text-brand text-sm font-medium whitespace-nowrap">
+              As per syllabus <Check size={16} />
+            </button>
+            <button className="px-4 py-2 rounded-full border border-white/10 text-slate-300 text-sm font-medium whitespace-nowrap hover:bg-white/5">
+              Removed
+            </button>
+            <button className="px-4 py-2 rounded-full border border-white/10 text-slate-300 text-sm font-medium whitespace-nowrap hover:bg-white/5">
+              Reduced
+            </button>
+          </div>
+
+          {activeFilter === 'Topic Wise' ? (
+            <div className="space-y-4">
+              <button 
+                onClick={() => setSelectedTopic('Units')}
+                className="w-full bg-slate-800/40 p-5 rounded-2xl border border-white/5 flex items-center justify-between hover:bg-slate-800/60 transition-colors text-left"
+              >
+                <div>
+                  <div className="font-bold text-lg mb-1">Units</div>
+                  <div className="text-sm text-slate-400">{Math.floor(activeChapter.totalQs * 0.3)} Questions</div>
+                </div>
+                <ChevronRight size={20} className="text-slate-500" />
+              </button>
+              
+              <button 
+                onClick={() => setSelectedTopic('Dimensions')}
+                className="w-full bg-slate-800/40 p-5 rounded-2xl border border-white/5 flex items-center justify-between hover:bg-slate-800/60 transition-colors text-left"
+              >
+                <div>
+                  <div className="font-bold text-lg mb-1">Dimensions</div>
+                  <div className="text-sm text-slate-400 flex items-center gap-3">
+                    {Math.floor(activeChapter.totalQs * 0.7)} Questions
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/50 text-rose-400 bg-rose-500/10">MUST DO</span>
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-slate-500" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Array.from({ length: Math.min(10, questionCount) }).map((_, i) => {
+                const isBookmarked = bookmarkedQs[i];
+
+                return (
+                  <div 
+                    key={i} 
+                    className="bg-slate-800/40 p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+                    onClick={() => navigate('/app/practice', { state: { questionIndex: i } })}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-sm">Q{i+1}</span>
+                        <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded border border-white/5">2025 • Shift 1</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {i % 3 === 0 && <Video size={16} className="text-brand" />}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }));
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                        >
+                          <Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-slate-200 leading-relaxed">
+                      A block of mass m is placed on a smooth inclined plane of inclination θ. The inclined plane is accelerated horizontally so that the block does not slip. What is the acceleration?
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <DashboardBottomNav />
+        </div>
+      );
     }
 
     return (
@@ -447,32 +710,6 @@ export default function ExamDashboard() {
         </div>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-        <div className="flex bg-slate-800 p-1 rounded-xl border border-white/5 min-w-max">
-          <button 
-            onClick={() => setActiveFilter(null)}
-            className={`px-4 py-1.5 text-sm font-bold rounded-lg ${!activeFilter ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
-          >
-            All PYQs
-          </button>
-          <button 
-            onClick={() => setActiveFilter('Topic Wise')}
-            className={`px-4 py-1.5 text-sm font-bold rounded-lg ${activeFilter === 'Topic Wise' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
-          >
-            Topic Wise
-          </button>
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-white/5 rounded-xl text-sm font-bold text-slate-300 whitespace-nowrap">
-          <Filter size={16} /> Filter
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-white/5 rounded-xl text-sm font-bold text-slate-300 whitespace-nowrap">
-          <Video size={16} /> Video Sol
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-white/5 rounded-xl text-sm font-bold text-slate-300 whitespace-nowrap">
-          Years <ChevronDown size={16} />
-        </button>
-      </div>
-
       <div className="flex items-center justify-between text-sm font-bold text-slate-400 mb-4">
         <span>{questionCount} Questions</span>
         <button className="flex items-center gap-1 text-brand">
@@ -482,13 +719,14 @@ export default function ExamDashboard() {
 
       <div className="space-y-6">
         {Array.from({ length: Math.min(10, questionCount) }).map((_, i) => {
-          const isAnswered = selectedAnswers[i] !== undefined;
-          const isCorrect = selectedAnswers[i] === 'B'; // Mock correct answer is B
-          const showSol = showSolutions[i];
           const isBookmarked = bookmarkedQs[i];
 
           return (
-            <div key={i} className="bg-slate-800/40 p-5 rounded-2xl border border-white/5">
+            <div 
+              key={i} 
+              className="bg-slate-800/40 p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+              onClick={() => navigate('/app/practice', { state: { questionIndex: i } })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <span className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-sm">Q{i+1}</span>
@@ -497,7 +735,10 @@ export default function ExamDashboard() {
                 <div className="flex items-center gap-3">
                   {i % 3 === 0 && <Video size={16} className="text-brand" />}
                   <button 
-                    onClick={() => setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }))}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }));
+                    }}
                     className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
                   >
                     <Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} />
@@ -505,123 +746,24 @@ export default function ExamDashboard() {
                 </div>
               </div>
               
-              <p className="text-sm text-slate-200 leading-relaxed mb-6">
+              <p className="text-sm text-slate-200 leading-relaxed">
                 A block of mass m is placed on a smooth inclined plane of inclination θ. The inclined plane is accelerated horizontally so that the block does not slip. What is the acceleration?
               </p>
-
-              <div className="space-y-3 mb-6">
-                {['g sin θ', 'g tan θ', 'g cos θ', 'g cot θ'].map((opt, optIdx) => {
-                  const letter = String.fromCharCode(65 + optIdx);
-                  const isSelected = selectedAnswers[i] === letter;
-                  const isCorrectOption = letter === 'B';
-                  
-                  let btnClass = "w-full p-4 rounded-xl border text-left flex items-center gap-4 transition-all ";
-                  
-                  if (isAnswered) {
-                    if (isCorrectOption) {
-                      btnClass += "bg-emerald-500/20 border-emerald-500/50 text-emerald-500";
-                    } else if (isSelected) {
-                      btnClass += "bg-rose-500/20 border-rose-500/50 text-rose-500";
-                    } else {
-                      btnClass += "bg-slate-800/50 border-white/5 text-slate-400 opacity-50";
-                    }
-                  } else {
-                    btnClass += "bg-slate-800/50 border-white/5 text-slate-300 hover:bg-slate-700 hover:border-white/10";
-                  }
-
-                  return (
-                    <button 
-                      key={optIdx}
-                      disabled={isAnswered}
-                      onClick={() => {
-                        setSelectedAnswers(prev => ({ ...prev, [i]: letter }));
-                        setCurrentQs(prev => prev + 1);
-                        if (isCorrectOption) {
-                          setPointsEarned(prev => prev + 10);
-                        }
-                      }}
-                      className={btnClass}
-                    >
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                        isAnswered && isCorrectOption ? 'bg-emerald-500/20 text-emerald-500' :
-                        isAnswered && isSelected ? 'bg-rose-500/20 text-rose-500' :
-                        'bg-slate-700 text-slate-400'
-                      }`}>
-                        {letter}
-                      </span>
-                      <span className="font-medium">{opt}</span>
-                      {isAnswered && isCorrectOption && <CheckCircle2 size={20} className="ml-auto text-emerald-500" />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {isAnswered && (
-                <div className="pt-4 border-t border-white/5">
-                  <button 
-                    onClick={() => setShowSolutions(prev => ({ ...prev, [i]: !prev[i] }))}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                  >
-                    {showSol ? 'Hide Solution' : 'View Solution'}
-                  </button>
-                  
-                  <AnimatePresence>
-                    {showSol && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-4 p-5 bg-slate-900 rounded-xl border border-white/5">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-bold text-emerald-500 flex items-center gap-2">
-                              <CheckCircle2 size={16} /> Correct Answer: B
-                            </h4>
-                            <button
-                              onClick={() => handleSaveToNotebook(i)}
-                              disabled={savedToNotebook[i]}
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                savedToNotebook[i] 
-                                  ? 'bg-emerald-500/20 text-emerald-500' 
-                                  : 'bg-brand/20 text-brand hover:bg-brand/30'
-                              }`}
-                            >
-                              {savedToNotebook[i] ? (
-                                <>
-                                  <CheckCircle2 size={14} />
-                                  Saved
-                                </>
-                              ) : (
-                                <>
-                                  <BookMarked size={14} />
-                                  Save to Notebook
-                                </>
-                              )}
-                            </button>
-                          </div>
-                          <p className="text-sm text-slate-300 leading-relaxed">
-                            For the block to not slip, the pseudo force (ma) must balance the component of weight along the incline.
-                            <br/><br/>
-                            ma cos θ = mg sin θ<br/>
-                            a = g tan θ
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
             </div>
           );
         })}
       </div>
-    </div>
+
+        <DashboardBottomNav />
+      </div>
     );
   };
 
   const renderAnalysis = () => (
-    <AnalysisDashboard onBack={() => setView('dashboard')} />
+    <div className="pb-24">
+      <AnalysisDashboard onBack={() => setView('dashboard')} />
+      <DashboardBottomNav />
+    </div>
   );
 
   const renderBookmarks = () => {
@@ -649,13 +791,14 @@ export default function ExamDashboard() {
         ) : (
           <div className="space-y-6">
             {bookmarkedIndices.map((i) => {
-              const isAnswered = selectedAnswers[i] !== undefined;
-              const isCorrect = selectedAnswers[i] === 'B'; // Mock correct answer is B
-              const showSol = showSolutions[i];
               const isBookmarked = bookmarkedQs[i];
 
               return (
-                <div key={i} className="bg-slate-800/40 p-5 rounded-2xl border border-white/5">
+                <div 
+                  key={i} 
+                  className="bg-slate-800/40 p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+                  onClick={() => navigate('/app/practice', { state: { questionIndex: i } })}
+                >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <span className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-sm">Q{i+1}</span>
@@ -664,7 +807,10 @@ export default function ExamDashboard() {
                     <div className="flex items-center gap-3">
                       {i % 3 === 0 && <Video size={16} className="text-brand" />}
                       <button 
-                        onClick={() => setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBookmarkedQs(prev => ({ ...prev, [i]: !prev[i] }));
+                        }}
                         className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
                       >
                         <Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} />
@@ -672,118 +818,15 @@ export default function ExamDashboard() {
                     </div>
                   </div>
                   
-                  <p className="text-sm text-slate-200 leading-relaxed mb-6">
+                  <p className="text-sm text-slate-200 leading-relaxed">
                     A block of mass m is placed on a smooth inclined plane of inclination θ. The inclined plane is accelerated horizontally so that the block does not slip. What is the acceleration?
                   </p>
-
-                  <div className="space-y-3 mb-6">
-                    {['g sin θ', 'g tan θ', 'g cos θ', 'g cot θ'].map((opt, optIdx) => {
-                      const letter = String.fromCharCode(65 + optIdx);
-                      const isSelected = selectedAnswers[i] === letter;
-                      const isCorrectOption = letter === 'B';
-                      
-                      let btnClass = "w-full p-4 rounded-xl border text-left flex items-center gap-4 transition-all ";
-                      
-                      if (isAnswered) {
-                        if (isCorrectOption) {
-                          btnClass += "bg-emerald-500/20 border-emerald-500/50 text-emerald-500";
-                        } else if (isSelected) {
-                          btnClass += "bg-rose-500/20 border-rose-500/50 text-rose-500";
-                        } else {
-                          btnClass += "bg-slate-800/50 border-white/5 text-slate-400 opacity-50";
-                        }
-                      } else {
-                        btnClass += "bg-slate-800/50 border-white/5 text-slate-300 hover:bg-slate-700 hover:border-white/10";
-                      }
-
-                      return (
-                        <button 
-                          key={optIdx}
-                          disabled={isAnswered}
-                          onClick={() => {
-                            setSelectedAnswers(prev => ({ ...prev, [i]: letter }));
-                            setCurrentQs(prev => prev + 1);
-                            if (isCorrectOption) {
-                              setPointsEarned(prev => prev + 10);
-                            }
-                          }}
-                          className={btnClass}
-                        >
-                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                            isAnswered && isCorrectOption ? 'bg-emerald-500/20 text-emerald-500' :
-                            isAnswered && isSelected ? 'bg-rose-500/20 text-rose-500' :
-                            'bg-slate-700 text-slate-400'
-                          }`}>
-                            {letter}
-                          </span>
-                          <span className="font-medium">{opt}</span>
-                          {isAnswered && isCorrectOption && <CheckCircle2 size={20} className="ml-auto text-emerald-500" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {isAnswered && (
-                    <div className="pt-4 border-t border-white/5">
-                      <button 
-                        onClick={() => setShowSolutions(prev => ({ ...prev, [i]: !prev[i] }))}
-                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                      >
-                        {showSol ? 'Hide Solution' : 'View Solution'}
-                      </button>
-                      
-                      <AnimatePresence>
-                        {showSol && (
-                          <motion.div 
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="mt-4 p-5 bg-slate-900 rounded-xl border border-white/5">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-bold text-emerald-500 flex items-center gap-2">
-                                  <CheckCircle2 size={16} /> Correct Answer: B
-                                </h4>
-                                <button
-                                  onClick={() => handleSaveToNotebook(i)}
-                                  disabled={savedToNotebook[i]}
-                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                    savedToNotebook[i] 
-                                      ? 'bg-emerald-500/20 text-emerald-500' 
-                                      : 'bg-brand/20 text-brand hover:bg-brand/30'
-                                  }`}
-                                >
-                                  {savedToNotebook[i] ? (
-                                    <>
-                                      <CheckCircle2 size={14} />
-                                      Saved
-                                    </>
-                                  ) : (
-                                    <>
-                                      <BookMarked size={14} />
-                                      Save to Notebook
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              <p className="text-sm text-slate-300 leading-relaxed">
-                                For the block to not slip, the pseudo force (ma) must balance the component of weight along the incline.
-                                <br/><br/>
-                                ma cos θ = mg sin θ<br/>
-                                a = g tan θ
-                              </p>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         )}
+        <DashboardBottomNav />
       </div>
     );
   };
@@ -804,6 +847,7 @@ export default function ExamDashboard() {
           Mistakes list will appear here
         </div>
       </div>
+      <DashboardBottomNav />
     </div>
   );
 
@@ -838,7 +882,12 @@ export default function ExamDashboard() {
               <div>
                 <h1 className="text-xl font-bold">{examKey}</h1>
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                  2025 - 2012 | 39 Papers | 17250 Qs
+                  2025 - 2012 | 39 Papers | {
+                    availableSubjects.reduce((acc, subject) => {
+                      const chapters = examData[subject as SubjectType] || [];
+                      return acc + chapters.reduce((subAcc, _, index) => subAcc + (50 + (index * 7) % 50), 0);
+                    }, 0)
+                  } Qs
                 </p>
               </div>
             </div>
@@ -1200,6 +1249,35 @@ export default function ExamDashboard() {
                 className="w-full py-3.5 mt-4 bg-brand text-white rounded-xl font-bold shadow-lg shadow-brand/20 hover:bg-brand-light transition-colors"
               >
                 Apply Filters
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Create Test Modal */}
+      <AnimatePresence>
+        {showCreateTestModal && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateTestModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center"
+            >
+              <div className="w-16 h-16 bg-brand/20 rounded-full flex items-center justify-center mb-4">
+                <FileEdit size={32} className="text-brand" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Create Custom Test</h3>
+              <p className="text-sm text-slate-400 mb-6">
+                This feature is coming soon! You will be able to create custom tests from your bookmarked questions and mistakes.
+              </p>
+              <button
+                onClick={() => setShowCreateTestModal(false)}
+                className="w-full py-3.5 bg-brand text-white rounded-xl font-bold shadow-lg shadow-brand/20 hover:bg-brand-light transition-colors"
+              >
+                Got it
               </button>
             </motion.div>
           </div>

@@ -1,23 +1,91 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Settings, Shield, Bell, LogOut, ChevronRight, Star, ArrowLeft, CheckCircle2, Smartphone, Monitor, Globe, Trash2 } from 'lucide-react';
+import { User, Settings, Shield, Bell, LogOut, ChevronRight, Star, ArrowLeft, CheckCircle2, Smartphone, Monitor, Globe, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '../context/UserContext';
+import { useUser, handleFirestoreError, OperationType } from '../context/UserContext';
+import { db } from '../firebase';
+import { collection, query, getDocs } from 'firebase/firestore';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { pointsEarned, userRank, streak } = useUser();
+  const { pointsEarned, userRank, streak, user, logout } = useUser();
   const [activeView, setActiveView] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [activityData, setActivityData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchActivity = async () => {
+      if (!user) return;
+      try {
+        const q = query(collection(db, `users/${user.uid}/activity`));
+        const querySnapshot = await getDocs(q);
+        const activities: Record<string, any> = {};
+        querySnapshot.forEach((doc) => {
+          activities[doc.id] = doc.data();
+        });
+
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        const newActivityData = Array.from({ length: daysInMonth }).map((_, i) => {
+          const d = i + 1;
+          const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dayData = activities[dateStr];
+          
+          if (dayData) {
+            let level = 0;
+            if (dayData.questionsSolved > 50) level = 4;
+            else if (dayData.questionsSolved > 30) level = 3;
+            else if (dayData.questionsSolved > 15) level = 2;
+            else if (dayData.questionsSolved > 0) level = 1;
+
+            return {
+              day: d,
+              level,
+              questionsSolved: dayData.questionsSolved,
+              accuracy: dayData.accuracy,
+              timeSpent: dayData.timeSpent
+            };
+          }
+
+          return {
+            day: d,
+            level: 0,
+            questionsSolved: 0,
+            accuracy: 0,
+            timeSpent: 0
+          };
+        });
+        setActivityData(newActivityData);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}/activity`);
+      }
+    };
+
+    fetchActivity();
+  }, [user]);
 
   // Personal Info State
   const [personalInfo, setPersonalInfo] = useState({
-    name: 'Student Name',
-    email: 'student@example.com',
-    phone: '+91 98765 43210',
-    dob: '2005-08-15',
+    name: user?.name || 'Student Name',
+    email: user?.email || 'student@example.com',
+    phone: '',
+    dob: '',
     gender: 'Male'
   });
+
+  useEffect(() => {
+    if (user) {
+      setPersonalInfo(prev => ({
+        ...prev,
+        name: user.name,
+        email: user.email
+      }));
+    }
+  }, [user]);
 
   // Security State
   const [security, setSecurity] = useState({
@@ -339,7 +407,7 @@ const Profile = () => {
               <div className="relative mb-4">
                 <div className="w-24 h-24 rounded-full border-4 border-brand p-1">
                   <img 
-                    src="https://picsum.photos/seed/user/200/200" 
+                    src={`https://picsum.photos/seed/${user?.uid || 'user'}/200/200`}
                     alt="Profile" 
                     className="w-full h-full rounded-full object-cover"
                     referrerPolicy="no-referrer"
@@ -349,8 +417,8 @@ const Profile = () => {
                   <Star size={14} fill="white" />
                 </div>
               </div>
-              <h1 className="text-2xl font-bold">Student Name</h1>
-              <p className="text-slate-500 font-medium">JEE 2026 Aspirant</p>
+              <h1 className="text-2xl font-bold">{user?.name || 'Student Name'}</h1>
+              <p className="text-slate-500 font-medium">{user?.email || 'JEE 2026 Aspirant'}</p>
               
               <div className="mt-6 flex gap-4 w-full max-w-xs">
                 <div className="flex-1 bg-slate-800/50 p-3 rounded-2xl border border-white/5">
@@ -372,6 +440,25 @@ const Profile = () => {
                   <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-1 rounded-lg">{streak} Day Streak! 🔥</span>
                 </div>
                 
+                <div className="flex gap-4 mb-4">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Qs</p>
+                    <p className="text-lg font-black text-white">{activityData.reduce((acc, curr) => acc + curr.questionsSolved, 0)}</p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Avg Accuracy</p>
+                    <p className="text-lg font-black text-emerald-500">
+                      {activityData.filter(d => d.level > 0).length > 0 ? Math.round(activityData.reduce((acc, curr) => acc + curr.accuracy, 0) / activityData.filter(d => d.level > 0).length) : 0}%
+                    </p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Time Spent</p>
+                    <p className="text-lg font-black text-blue-500">
+                      {Math.round(activityData.reduce((acc, curr) => acc + curr.timeSpent, 0) / 60)}h
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-7 gap-2 text-center mb-2">
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
                     <div key={i} className="text-xs font-bold text-slate-500">{d}</div>
@@ -382,26 +469,65 @@ const Profile = () => {
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={`blank-${i}`} />
                   ))}
-                  {Array.from({ length: 31 }).map((_, i) => {
-                    const d = i + 1;
-                    const level = Math.floor(Math.random() * 5);
+                  {activityData.map((data) => {
                     let colorClass = 'bg-slate-700/50 text-slate-400';
-                    if (level === 1) colorClass = 'bg-brand/20 text-brand';
-                    if (level === 2) colorClass = 'bg-brand/40 text-white';
-                    if (level === 3) colorClass = 'bg-brand/70 text-white';
-                    if (level === 4) colorClass = 'bg-brand text-white';
+                    if (data.level === 1) colorClass = 'bg-brand/20 text-brand';
+                    if (data.level === 2) colorClass = 'bg-brand/40 text-white';
+                    if (data.level === 3) colorClass = 'bg-brand/70 text-white';
+                    if (data.level === 4) colorClass = 'bg-brand text-white';
                     
                     return (
-                      <div 
-                        key={d} 
-                        className={`aspect-square rounded-lg flex items-center justify-center text-xs font-bold ${colorClass}`}
+                      <button 
+                        key={data.day} 
+                        onClick={() => setSelectedDay(selectedDay === data.day ? null : data.day)}
+                        className={`aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all ${colorClass} ${selectedDay === data.day ? 'ring-2 ring-white scale-110 z-10' : 'hover:scale-105'}`}
                       >
-                        {d}
-                      </div>
+                        {data.day}
+                      </button>
                     );
                   })}
                 </div>
                 
+                <AnimatePresence>
+                  {selectedDay !== null && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4 bg-slate-800/80 rounded-xl p-4 border border-white/10 overflow-hidden"
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-white">Day {selectedDay} Activity</h4>
+                        <button onClick={() => setSelectedDay(null)} className="text-slate-400 hover:text-white">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      {(() => {
+                        const data = activityData.find(d => d.day === selectedDay);
+                        if (!data || data.level === 0) {
+                          return <p className="text-sm text-slate-400">No activity recorded on this day.</p>;
+                        }
+                        return (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+                              <div className="text-lg font-black text-brand">{data.questionsSolved}</div>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase">Qs Solved</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+                              <div className="text-lg font-black text-emerald-500">{data.accuracy}%</div>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase">Accuracy</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-3 rounded-lg text-center">
+                              <div className="text-lg font-black text-blue-500">{data.timeSpent}m</div>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase">Time</div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="flex items-center justify-between mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <span>Less</span>
                   <div className="flex gap-1">
@@ -432,7 +558,14 @@ const Profile = () => {
               </div>
 
               <button 
-                onClick={() => navigate('/')}
+                onClick={async () => {
+                  try {
+                    await logout();
+                    navigate('/');
+                  } catch (err) {
+                    console.error('Failed to log out', err);
+                  }
+                }}
                 className="w-full flex items-center justify-center gap-3 p-5 bg-rose-500/10 text-rose-500 rounded-2xl font-bold hover:bg-rose-500/20 transition-all mt-8"
               >
                 <LogOut size={20} />
