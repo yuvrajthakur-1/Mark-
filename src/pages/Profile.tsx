@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Settings, Shield, Bell, LogOut, ChevronRight, Star, ArrowLeft, CheckCircle2, Smartphone, Monitor, Globe, Trash2, X } from 'lucide-react';
+import { User, Settings, Shield, Bell, LogOut, ChevronRight, Star, ArrowLeft, CheckCircle2, Smartphone, Monitor, Globe, Trash2, X, Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser, handleFirestoreError, OperationType } from '../context/UserContext';
 import { db } from '../firebase';
@@ -8,11 +8,52 @@ import { collection, query, getDocs } from 'firebase/firestore';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { pointsEarned, userRank, streak, user, logout } = useUser();
+  const { pointsEarned, userRank, streak, user, logout, theme, setTheme, notifications, setNotifications, profilePic, setProfilePic, activityHistory, dailyGoal } = useUser();
   const [activeView, setActiveView] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [activityData, setActivityData] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Compress the image to JPEG with 0.7 quality to keep it well under 1MB
+          const base64String = canvas.toDataURL('image/jpeg', 0.7);
+          setProfilePic(base64String);
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -37,9 +78,9 @@ const Profile = () => {
           
           if (dayData) {
             let level = 0;
-            if (dayData.questionsSolved > 50) level = 4;
-            else if (dayData.questionsSolved > 30) level = 3;
-            else if (dayData.questionsSolved > 15) level = 2;
+            if (dayData.questionsSolved >= dailyGoal) level = 4; // Goal completed
+            else if (dayData.questionsSolved >= dailyGoal * 0.75) level = 3;
+            else if (dayData.questionsSolved >= dailyGoal * 0.5) level = 2;
             else if (dayData.questionsSolved > 0) level = 1;
 
             return {
@@ -47,7 +88,9 @@ const Profile = () => {
               level,
               questionsSolved: dayData.questionsSolved,
               accuracy: dayData.accuracy,
-              timeSpent: dayData.timeSpent
+              timeSpent: dayData.timeSpent,
+              dateStr,
+              goalCompleted: dayData.questionsSolved >= dailyGoal
             };
           }
 
@@ -56,7 +99,9 @@ const Profile = () => {
             level: 0,
             questionsSolved: 0,
             accuracy: 0,
-            timeSpent: 0
+            timeSpent: 0,
+            dateStr,
+            goalCompleted: false
           };
         });
         setActivityData(newActivityData);
@@ -95,18 +140,8 @@ const Profile = () => {
     twoFactor: false
   });
 
-  // Notifications State
-  const [notifications, setNotifications] = useState({
-    push: true,
-    email: true,
-    reminders: true,
-    newContent: true,
-    marketing: false
-  });
-
   // Settings State
   const [settings, setSettings] = useState({
-    theme: 'Dark Mode',
     targetExam: 'JEE Main',
     language: 'English',
     videoQuality: 'Auto'
@@ -129,6 +164,30 @@ const Profile = () => {
       case 'personal':
         return (
           <div className="space-y-4">
+            <div className="flex flex-col items-center mb-6">
+              <div className="relative mb-2">
+                <div className="w-24 h-24 rounded-full border-4 border-brand p-1 relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                  <img 
+                    src={profilePic || `https://picsum.photos/seed/${user?.uid || 'user'}/200/200`}
+                    alt="Profile" 
+                    className="w-full h-full rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={24} className="text-white" />
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Tap to change profile picture</p>
+            </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Full Name</label>
               <input 
@@ -273,8 +332,8 @@ const Profile = () => {
             <div className="space-y-3">
               {[
                 { id: 'push', title: 'Push Notifications', desc: 'Receive alerts on your device' },
-                { id: 'email', title: 'Email Updates', desc: 'Weekly progress reports' },
-                { id: 'reminders', title: 'Test Reminders', desc: 'Alerts before scheduled tests' },
+                { id: 'emails', title: 'Email Updates', desc: 'Weekly progress reports' },
+                { id: 'testReminders', title: 'Test Reminders', desc: 'Alerts before scheduled tests' },
                 { id: 'newContent', title: 'New Content', desc: 'When new PYQs are added' },
                 { id: 'marketing', title: 'Offers & Promotions', desc: 'Special discounts and offers' }
               ].map((item) => (
@@ -305,13 +364,13 @@ const Profile = () => {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">App Theme</label>
                 <select 
-                  value={settings.theme}
-                  onChange={(e) => setSettings({...settings, theme: e.target.value})}
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
                   className="w-full p-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white outline-none focus:border-brand transition-colors appearance-none"
                 >
-                  <option>Dark Mode</option>
-                  <option>Light Mode</option>
-                  <option>System Default</option>
+                  <option value="dark">Dark Mode</option>
+                  <option value="light">Light Mode</option>
+                  <option value="system">System Default</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -405,12 +464,23 @@ const Profile = () => {
           >
             <header className="px-6 pt-12 pb-8 flex flex-col items-center text-center">
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full border-4 border-brand p-1">
+                <div className="w-24 h-24 rounded-full border-4 border-brand p-1 relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                   <img 
-                    src={`https://picsum.photos/seed/${user?.uid || 'user'}/200/200`}
+                    src={profilePic || `https://picsum.photos/seed/${user?.uid || 'user'}/200/200`}
                     alt="Profile" 
                     className="w-full h-full rounded-full object-cover"
                     referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={24} className="text-white" />
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
                   />
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-brand rounded-full flex items-center justify-center border-4 border-[#0f172a]">
@@ -480,9 +550,12 @@ const Profile = () => {
                       <button 
                         key={data.day} 
                         onClick={() => setSelectedDay(selectedDay === data.day ? null : data.day)}
-                        className={`aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all ${colorClass} ${selectedDay === data.day ? 'ring-2 ring-white scale-110 z-10' : 'hover:scale-105'}`}
+                        className={`aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all relative ${colorClass} ${selectedDay === data.day ? 'ring-2 ring-white scale-110 z-10' : 'hover:scale-105'}`}
                       >
                         {data.day}
+                        {data.goalCompleted && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#1e293b]" />
+                        )}
                       </button>
                     );
                   })}
@@ -528,16 +601,22 @@ const Profile = () => {
                   )}
                 </AnimatePresence>
 
-                <div className="flex items-center justify-between mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <span>Less</span>
-                  <div className="flex gap-1">
-                    <div className="w-4 h-4 rounded-sm bg-slate-700/50" />
-                    <div className="w-4 h-4 rounded-sm bg-brand/20" />
-                    <div className="w-4 h-4 rounded-sm bg-brand/40" />
-                    <div className="w-4 h-4 rounded-sm bg-brand/70" />
-                    <div className="w-4 h-4 rounded-sm bg-brand" />
+                <div className="flex flex-col gap-2 mt-4">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Less</span>
+                    <div className="flex gap-1">
+                      <div className="w-4 h-4 rounded-sm bg-slate-700/50" />
+                      <div className="w-4 h-4 rounded-sm bg-brand/20" />
+                      <div className="w-4 h-4 rounded-sm bg-brand/40" />
+                      <div className="w-4 h-4 rounded-sm bg-brand/70" />
+                      <div className="w-4 h-4 rounded-sm bg-brand" />
+                    </div>
+                    <span>More</span>
                   </div>
-                  <span>More</span>
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full" />
+                    <span>Goal Completed</span>
+                  </div>
                 </div>
               </div>
 

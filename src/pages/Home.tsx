@@ -29,67 +29,17 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState('Physics');
   
   // Daily Goal State from Context
-  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, dailyPoints, streak, setStreak, user } = useUser();
+  const { dailyGoal, setDailyGoal, currentQs, setCurrentQs, dailyPoints, streak, setStreak, user, chapterProgress, tasks, setTasks, profilePic } = useUser();
   
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newGoalValue, setNewGoalValue] = useState(dailyGoal.toString());
   const [wrongQs, setWrongQs] = useState(35); // Start with a few wrong questions to demonstrate
   const [correctQs, setCorrectQs] = useState(85);
   
-  // Daily Tasks State
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Solve 50 Physics PYQs', completed: false },
-    { id: 2, title: 'Take a Custom Test', completed: true },
-    { id: 3, title: 'Review Mistakes', completed: false },
-  ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
 
   const progressPercentage = Math.min(100, Math.max(0, (currentQs / dailyGoal) * 100));
   const isTodayCompleted = currentQs >= dailyGoal;
-
-  useEffect(() => {
-    const todayStr = new Date().toDateString();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    const lastCompletedDate = localStorage.getItem('lastCompletedDate');
-    let currentStreak = parseInt(localStorage.getItem('studyStreak') || '0');
-
-    // Initialize if empty
-    if (!localStorage.getItem('studyStreak')) {
-      currentStreak = streak;
-      localStorage.setItem('studyStreak', currentStreak.toString());
-      localStorage.setItem('lastCompletedDate', yesterdayStr);
-    }
-
-    if (currentQs >= dailyGoal) {
-      if (lastCompletedDate !== todayStr) {
-        if (lastCompletedDate === yesterdayStr) {
-          currentStreak += 1;
-        } else {
-          currentStreak = 1;
-        }
-        localStorage.setItem('lastCompletedDate', todayStr);
-        localStorage.setItem('studyStreak', currentStreak.toString());
-        setStreak(currentStreak);
-      } else {
-         if (streak !== currentStreak) {
-           setStreak(currentStreak);
-         }
-      }
-    } else {
-      if (lastCompletedDate !== todayStr && lastCompletedDate !== yesterdayStr) {
-        currentStreak = 0;
-        localStorage.setItem('studyStreak', '0');
-        setStreak(0);
-      } else {
-        if (streak !== currentStreak) {
-          setStreak(currentStreak);
-        }
-      }
-    }
-  }, [currentQs, dailyGoal, setStreak, streak]);
 
   // Generate last 7 days for streak
   const last7Days = Array.from({ length: 7 }).map((_, i) => {
@@ -174,9 +124,9 @@ const Home = () => {
       {/* Header */}
       <header className="px-6 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-[#0f172a]/80 backdrop-blur-lg z-40">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full border-2 border-brand p-0.5">
+          <div className="w-12 h-12 rounded-full border-2 border-brand p-0.5 overflow-hidden">
             <img 
-              src={`https://picsum.photos/seed/${user?.uid || 'user'}/100/100`}
+              src={profilePic || `https://picsum.photos/seed/${user?.uid || 'user'}/100/100`}
               alt="Avatar" 
               className="w-full h-full rounded-full object-cover"
               referrerPolicy="no-referrer"
@@ -331,9 +281,19 @@ const Home = () => {
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Daily Tasks</h2>
-            <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-md">
-              {tasks.filter(t => t.completed).length}/{tasks.length} Done
-            </span>
+            <div className="flex items-center gap-3">
+              {tasks.some(t => t.completed) && (
+                <button 
+                  onClick={() => setTasks(tasks.filter(t => !t.completed))}
+                  className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                >
+                  Clear Completed
+                </button>
+              )}
+              <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-md">
+                {tasks.filter(t => t.completed).length}/{tasks.length} Done
+              </span>
+            </div>
           </div>
 
           <form onSubmit={handleAddTask} className="mb-4 flex gap-2">
@@ -386,6 +346,39 @@ const Home = () => {
             {tasks.length === 0 && (
               <div className="text-center text-slate-500 text-sm py-4">
                 No tasks for today. Add one above!
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Chapter Progress */}
+        <section>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Chapter Progress</h2>
+          </div>
+          <div className="space-y-4">
+            {Object.keys(chapterProgress || {}).length > 0 ? (
+              Object.entries(chapterProgress).map(([chapterId, progress]) => (
+                <div key={chapterId} className="bg-slate-800/50 p-4 rounded-2xl border border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold capitalize">{chapterId.replace(/-/g, ' ')}</h3>
+                    {progress.completed && <CheckCircle2 size={16} className="text-emerald-500" />}
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-400 mb-2">
+                    <span>{progress.questionsSolved} Qs Solved</span>
+                    <span>{progress.accuracy}% Accuracy</span>
+                  </div>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${progress.accuracy >= 80 ? 'bg-emerald-500' : progress.accuracy >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                      style={{ width: `${progress.accuracy}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center text-slate-500 text-sm py-4 bg-slate-800/30 rounded-2xl border border-white/5">
+                Start practicing to track your chapter progress!
               </div>
             )}
           </div>

@@ -20,12 +20,30 @@ const Scratchpad: React.FC<ScratchpadProps> = ({ onClose }) => {
   const [color, setColor] = useState('#3B82F6');
   const [lineWidth, setLineWidth] = useState(2);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showColors, setShowColors] = useState(false);
-  const [showSizes, setShowSizes] = useState(false);
 
-  const [paths, setPaths] = useState<Stroke[]>([]);
-  const [redoPaths, setRedoPaths] = useState<Stroke[]>([]);
+  const [paths, setPaths] = useState<Stroke[]>(() => {
+    const saved = localStorage.getItem('scratchpad_paths');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [];
+  });
+  const [redoPaths, setRedoPaths] = useState<Stroke[]>(() => {
+    const saved = localStorage.getItem('scratchpad_redo_paths');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [];
+  });
   const [currentPath, setCurrentPath] = useState<Stroke | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('scratchpad_paths', JSON.stringify(paths));
+  }, [paths]);
+
+  useEffect(() => {
+    localStorage.setItem('scratchpad_redo_paths', JSON.stringify(redoPaths));
+  }, [redoPaths]);
 
   // Dragging state
   const [position, setPosition] = useState({ x: 20, y: 20 });
@@ -269,107 +287,99 @@ const Scratchpad: React.FC<ScratchpadProps> = ({ onClose }) => {
     >
       {/* Header / Toolbar */}
       <div 
-        className={`flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-white/5 ${!isExpanded ? 'cursor-move' : ''}`}
+        className={`flex items-center justify-between px-3 py-2 bg-slate-800 border-b border-white/5 ${!isExpanded ? 'cursor-move' : ''}`}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
       >
-        <div className="flex items-center gap-2">
-          {!isExpanded && <GripHorizontal size={16} className="text-slate-500 mr-2" />}
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setMode('pen'); setShowColors(!showColors); setShowSizes(false); }}
-              className={`p-2 rounded-lg transition-colors ${mode === 'pen' ? 'bg-brand text-white' : 'text-slate-400 hover:bg-white/5'}`}
-              title="Pen"
-            >
-              <Pen size={18} />
-            </button>
-            {showColors && mode === 'pen' && (
-              <div className="absolute top-full left-0 mt-2 p-2 bg-slate-800 border border-white/10 rounded-xl shadow-xl flex gap-2 z-50">
-                {COLORS.map(c => (
-                  <button
-                    key={c}
-                    onClick={(e) => { e.stopPropagation(); setColor(c); setShowColors(false); }}
-                    className={`w-6 h-6 rounded-full border-2 ${color === c ? 'border-white' : 'border-transparent'}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {!isExpanded && <GripHorizontal size={16} className="text-slate-500 mr-1 shrink-0" />}
           
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowSizes(!showSizes); setShowColors(false); }}
-              className="p-2 rounded-lg text-slate-400 hover:bg-white/5 transition-colors"
-              title="Line Width"
-            >
-              <div className="w-4 h-4 rounded-full bg-current flex items-center justify-center">
-                <div className="bg-slate-800 rounded-full" style={{ width: 16 - lineWidth, height: 16 - lineWidth }} />
-              </div>
-            </button>
-            {showSizes && (
-              <div className="absolute top-full left-0 mt-2 p-2 bg-slate-800 border border-white/10 rounded-xl shadow-xl flex flex-col gap-2 z-50">
-                {SIZES.map(s => (
-                  <button
-                    key={s}
-                    onClick={(e) => { e.stopPropagation(); setLineWidth(s); setShowSizes(false); }}
-                    className={`flex items-center justify-center w-8 h-8 rounded-lg ${lineWidth === s ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                  >
-                    <div className="bg-white rounded-full" style={{ width: s, height: s }} />
-                  </button>
-                ))}
-              </div>
-            )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setMode('pen'); }}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${mode === 'pen' ? 'bg-brand text-white' : 'text-slate-400 hover:bg-white/5'}`}
+            title="Pen"
+          >
+            <Pen size={16} />
+          </button>
+
+          {/* Inline Colors */}
+          <div className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded-lg shrink-0 mx-1">
+            {COLORS.map(c => (
+              <button
+                key={c}
+                onClick={(e) => { e.stopPropagation(); setColor(c); setMode('pen'); }}
+                className={`w-5 h-5 rounded-full border-2 transition-transform ${color === c && mode === 'pen' ? 'border-white scale-110' : 'border-transparent hover:scale-110'}`}
+                style={{ backgroundColor: c }}
+                title={`Color: ${c}`}
+              />
+            ))}
           </div>
 
+          {/* Inline Sizes */}
+          <div className="flex items-center gap-1 bg-slate-900/50 px-2 py-1 rounded-lg shrink-0 mx-1">
+            {SIZES.map(s => (
+              <button
+                key={s}
+                onClick={(e) => { e.stopPropagation(); setLineWidth(s); }}
+                className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors ${lineWidth === s ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                title={`Size: ${s}`}
+              >
+                <div className="bg-white rounded-full" style={{ width: s, height: s }} />
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
+
           <button
-            onClick={(e) => { e.stopPropagation(); setMode('eraser'); setShowColors(false); setShowSizes(false); }}
-            className={`p-2 rounded-lg transition-colors ${mode === 'eraser' ? 'bg-white/20 text-white' : 'text-slate-400 hover:bg-white/5'}`}
+            onClick={(e) => { e.stopPropagation(); setMode('eraser'); }}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${mode === 'eraser' ? 'bg-white/20 text-white' : 'text-slate-400 hover:bg-white/5'}`}
             title="Eraser"
           >
-            <Eraser size={18} />
+            <Eraser size={16} />
           </button>
-          <div className="w-px h-6 bg-white/10 mx-1" />
+          
+          <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
+
           <button
             onClick={(e) => { e.stopPropagation(); handleUndo(); }}
             disabled={paths.length === 0}
-            className="p-2 rounded-lg text-slate-400 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors shrink-0"
             title="Undo"
           >
-            <Undo size={18} />
+            <Undo size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleRedo(); }}
             disabled={redoPaths.length === 0}
-            className="p-2 rounded-lg text-slate-400 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors shrink-0"
             title="Redo"
           >
-            <Redo size={18} />
+            <Redo size={16} />
           </button>
-          <div className="w-px h-6 bg-white/10 mx-1" />
           <button
             onClick={(e) => { e.stopPropagation(); handleClear(); }}
-            className="p-2 rounded-lg text-rose-400 hover:bg-rose-500/10 transition-colors"
+            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
             title="Clear All"
           >
-            <Trash2 size={18} />
+            <Trash2 size={16} />
           </button>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           <button
             onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-            className="p-2 rounded-lg text-slate-400 hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/5 transition-colors"
             title={isExpanded ? "Minimize" : "Maximize"}
           >
             {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onClose(); }}
-            className="p-2 rounded-lg text-slate-400 hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
             title="Close Scratchpad"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
       </div>
@@ -378,7 +388,6 @@ const Scratchpad: React.FC<ScratchpadProps> = ({ onClose }) => {
       <div 
         ref={containerRef} 
         className="flex-1 relative bg-[#1E293B] cursor-crosshair touch-none"
-        onClick={() => { setShowColors(false); setShowSizes(false); }}
       >
         {/* Grid Background */}
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
